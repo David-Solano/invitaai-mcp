@@ -100,6 +100,10 @@ guests one question at a time (a slash command in clients that support prompts).
   the agent can't drift from what exists — and `personalizar_diseno` applies a chosen combination
   plus a custom palette. Free-form CSS is deliberately not exposed: an invitation shown to guests
   shouldn't depend on a model writing stylesheets.
+- **Song links are verified, not trusted.** Models invent plausible YouTube/Spotify URLs, so
+  `poner_musica` resolves the link through the provider's oEmbed endpoint: a fake link is refused
+  and a real one supplies the actual track title. Spotify answers come with a note that guests
+  without a session only hear a 30-second preview.
 - **The agent is blind to the result.** Its instructions say so: propose named looks, apply, and ask
   the user to open the link and react. The loop is human-in-the-eye, not guesswork.
 - **Only public https image links** reach the invitation (`javascript:`, `http:` and non-images are rejected).

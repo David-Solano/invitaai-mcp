@@ -35,10 +35,15 @@ Cómo acompañar al usuario:
   (usa buscar_fotos para ofrecerle opciones con nombre), música y tono de los textos.
   Una pregunta a la vez; no inventes preferencias.
 - Eres el diseñador: con ver_opciones_de_diseno arma 2 o 3 propuestas completas (tema +
-  tipografías + textura + ornamento + paleta), ponles nombre, descríbeselas en palabras y deja
-  que elija. Aplica la elegida con personalizar_diseno y pídele que abra el link para opinar.
+  tipografías + textura + ornamento + paleta), ponles nombre y descríbelas. Si le presentas las
+  opciones como una lista para elegir, mete la descripción DENTRO del texto de cada opción
+  ("Glam night — negro y dorado, letra caligráfica, textura de seda"): el usuario puede verlas en
+  una lista sin más contexto, y un nombre suelto no le dice nada. Aplica la elegida con personalizar_diseno y pídele que abra el link para opinar.
 - No ves la invitación renderizada. Después de cada cambio pide al usuario que la mire y te diga
   qué ajustar; itera con él en vez de suponer que quedó bien.
+- Nunca inventes links de canciones ni de fotos. Si quiere música, pídele que pegue el link
+  desde YouTube o Spotify; YouTube suena completo para todos los invitados, Spotify solo 30
+  segundos a quien no tenga sesión.
 - El usuario no puede pasarte archivos: si quiere usar sus propias fotos (del celular o la
   computadora), usa crear_link_para_subir_fotos y dile que abra ese link. No le pidas una URL.
 - Los textos de la invitación los escribes tú, con la información del evento, y los
@@ -481,13 +486,26 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         return {"invitacion_id": invitacion_id, "fotos_en_galeria": len(gallery)}
 
     @tool(WRITE)
-    async def poner_musica(invitacion_id: str, url_embed: str, titulo: str = "") -> dict:
-        """Pone música de fondo. url_embed es el link para insertar (por ejemplo, el embed de
-        Spotify o YouTube de la canción)."""
-        if not url_embed.startswith("https://"):
-            raise InvitaAIError("El link de la música debe empezar con https://")
-        await _update_design(invitacion_id, {"music_embed_url": url_embed, "music_title": titulo})
-        return {"invitacion_id": invitacion_id, "musica": titulo or url_embed}
+    async def poner_musica(invitacion_id: str, link_de_la_cancion: str, titulo: str = "") -> dict:
+        """Pone música de fondo con un link de YouTube o Spotify.
+        NO inventes el link: pídele al usuario que lo copie desde su app de música. El link se
+        verifica contra el servicio antes de guardarlo y se usa el título real de la canción."""
+        cancion = await client.request("POST", "/api/music/resolve", json={"url": link_de_la_cancion})
+        await _update_design(invitacion_id, {
+            "music_embed_url": cancion["url"],
+            "music_title": titulo or cancion["title"],
+        })
+        resultado = {
+            "invitacion_id": invitacion_id,
+            "musica": titulo or cancion["title"],
+            "servicio": cancion["provider"],
+        }
+        if cancion["provider"] == "spotify":
+            resultado["nota"] = (
+                "Spotify solo deja escuchar 30 segundos a quien no tenga sesión iniciada. "
+                "Si quieres que todos los invitados oigan la canción completa, usa un link de YouTube."
+            )
+        return resultado
 
     # --- Guests -------------------------------------------------------------------
 

@@ -89,6 +89,15 @@ class FakeInvitaAI:
         if parts == ["upload-tickets"] and method == "POST":
             return 200, {"url": "https://invitaai.test/subir/tok123", "expira_en_minutos": 30,
                          "maximo_fotos": 10, "destino": body["target"]}
+        if parts == ["music", "resolve"]:
+            url = body["url"]
+            if "youtube.com" in url or "youtu.be" in url:
+                return 200, {"provider": "youtube", "url": "https://www.youtube.com/watch?v=abc12345678",
+                             "title": "Perfect - Ed Sheeran"}
+            if "open.spotify.com/track/real" in url:
+                return 200, {"provider": "spotify", "url": "https://open.spotify.com/track/real", "title": "Perfect"}
+            return 400, {"detail": {"error": "invalid_music_link",
+                                    "message": "Ese link no existe o no es público. Pide al usuario que copie el link desde su app de música."}}
         if parts == ["design-catalog"]:
             return 200, {
                 "temas": [{"key": "borgona", "label": "Borgoña"}],

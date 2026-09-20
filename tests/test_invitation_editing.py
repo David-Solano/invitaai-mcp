@@ -83,7 +83,8 @@ async def test_cover_gallery_and_music_accumulate_instead_of_replacing(api, stor
         await call(client, "agregar_fotos_galeria", {"invitacion_id": iid, "urls": ["https://cdn.test/a.jpg"]})
         await call(client, "agregar_fotos_galeria", {"invitacion_id": iid,
                                                      "urls": ["https://cdn.test/a.jpg", "https://cdn.test/b.webp"]})
-        await call(client, "poner_musica", {"invitacion_id": iid, "url_embed": "https://open.spotify.com/embed/x",
+        await call(client, "poner_musica", {"invitacion_id": iid,
+                                            "link_de_la_cancion": "https://youtu.be/abc12345678",
                                             "titulo": "Perfect"})
         _, view = await call(client, "ver_invitacion", {"invitacion_id": iid})
 
@@ -182,3 +183,42 @@ async def test_invalid_design_values_are_rejected_with_the_options(api, store, a
         _, inv = await setup_invitation(client, api)
         status, text = await call(client, "personalizar_diseno", {"invitacion_id": inv["invitacion_id"], **args})
     assert status == "error" and esperado in text
+
+
+# --- Music ------------------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_invented_song_links_are_caught(api, store):
+    """Models make up plausible links; the API checks the track exists before it's saved."""
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        status, text = await call(client, "poner_musica", {
+            "invitacion_id": inv["invitacion_id"],
+            "link_de_la_cancion": "https://open.spotify.com/track/inventado123",
+        })
+    assert status == "error" and "copie el link" in text
+    assert "music_embed_url" not in api.invitations[inv["invitacion_id"]]["design"]
+
+
+@pytest.mark.anyio
+async def test_real_link_saves_the_real_title(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        _, music = await call(client, "poner_musica", {
+            "invitacion_id": inv["invitacion_id"], "link_de_la_cancion": "https://youtu.be/abc12345678",
+        })
+    assert music["musica"] == "Perfect - Ed Sheeran" and music["servicio"] == "youtube"
+    assert "nota" not in music
+
+
+@pytest.mark.anyio
+async def test_spotify_warns_about_the_30_second_preview(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        _, music = await call(client, "poner_musica", {
+            "invitacion_id": inv["invitacion_id"], "link_de_la_cancion": "https://open.spotify.com/track/real",
+        })
+    assert "30 segundos" in music["nota"]
