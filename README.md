@@ -34,7 +34,7 @@ public API as the web app, so ownership checks and business rules are enforced s
 | Warning from 14 days before expiry | Every tool result carries an `aviso` the agent relays to the user. |
 | `device_code` and token never returned to the model | Tool outputs contain links and codes for the user, never secrets. |
 | Local token file created with `0600` | Only the user can read it (POSIX). |
-| No destructive tools (delete event/guest) in v1 | Limits damage from prompt injection. |
+| No destructive tools (delete event/guest) and no local file access | Limits damage from prompt injection. |
 | Guest RSVP messages returned as `mensaje_del_invitado` and flagged in the instructions | Third-party text is data, not instructions. |
 | Event type and theme are enums in the tool schema | Invalid values are rejected before reaching the API. |
 
@@ -46,9 +46,26 @@ public API as the web app, so ownership checks and business rules are enforced s
 | `estado_conexion` | Read |
 | `listar_eventos`, `ver_evento` | Read |
 | `crear_evento`, `editar_evento` | Write |
-| `crear_invitacion`, `activar_invitacion` | Write |
+| `ver_invitacion` | Read |
+| `crear_invitacion`, `editar_invitacion`, `activar_invitacion` | Write |
+| `buscar_fotos` | Read |
+| `cambiar_foto_portada`, `agregar_fotos_galeria`, `poner_musica` | Write |
 | `agregar_invitado`, `listar_invitados` | Write / Read |
 | `ver_confirmaciones` | Read |
+
+Prompt: `crear_invitacion_guiada` walks the user through event data, theme, photos, texts and
+guests one question at a time (a slash command in clients that support prompts).
+
+### Design notes
+
+- **Edits merge, never replace.** The API stores invitation texts and design as whole objects,
+  so every edit tool reads the current one and writes back only the requested change. Changing
+  the music can't wipe the gallery.
+- **Creating a second invitation for an event is refused**, pointing the model at `editar_invitacion`.
+  Without that, an agent asked to "change the colour" creates a duplicate and the shared link goes stale.
+- **The client model writes the invitation texts.** The platform's templates fill the rest, so no
+  section is ever left blank and no extra LLM bill is added.
+- **Only public https image links** reach the invitation (`javascript:`, `http:` and non-images are rejected).
 
 ## Install
 

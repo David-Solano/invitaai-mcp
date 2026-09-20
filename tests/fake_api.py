@@ -74,13 +74,43 @@ class FakeInvitaAI:
         if parts[0] == "events" and len(parts) == 2 and method == "PUT":
             self.events[parts[1]].update(body)
             return 200, {"ok": True}
+        if parts[0] == "events" and len(parts) == 2 and method == "GET":
+            e = self.events[parts[1]]
+            return 200, {
+                "id": e["id"], "title": e["title"], "event_type": e["event_type"], "description": e.get("description", ""),
+                "event_date": e["event_date"], "event_time": e.get("event_time", ""), "location": e.get("location", ""),
+                "host_name": e.get("host_name", ""),
+                "invitations": [
+                    {"id": i["id"], "slug": i["slug"], "theme": i["theme"], "content": i["content"],
+                     "is_active": i["is_active"], "view_count": 0}
+                    for i in self.invitations.values() if i["event_id"] == e["id"]
+                ],
+            }
+        if parts == ["stock-photos"]:
+            return 200, {
+                "photos": [{"label": "Rosa y dorado", "url": "https://cdn.test/rosa.png", "tags": ["boda"]}],
+                "tags": ["boda", "xv"],
+            }
         if parts == ["invitations"] and method == "POST":
             iid = uuid.uuid4().hex
-            self.invitations[iid] = {"id": iid, "slug": iid[:10], "is_active": True, **body}
+            # The real API fills the texts from templates when no content is sent.
+            plantilla = {"headline": "Plantilla", "subtitle": "Invitación", "main_message": "Te esperamos",
+                         "dress_code": "Casual elegante", "closing_message": "¡Gracias!", "hashtag": "#evento"}
+            self.invitations[iid] = {"id": iid, "slug": iid[:10], "is_active": True, "theme": body.get("theme", "perla"),
+                                     "event_id": body["event_id"], "content": body.get("content") or plantilla,
+                                     "design": {}}
             return 200, {"id": iid, "slug": iid[:10]}
+        if parts[0] == "invitations" and len(parts) == 2 and method == "PUT":
+            inv = self.invitations[parts[1]]
+            for key in ("theme", "content", "design"):
+                if key in body:
+                    inv[key] = body[key]  # the real API replaces these wholesale — hence merging in the MCP
+            return 200, {"id": inv["id"], "slug": inv["slug"], "theme": inv["theme"],
+                         "content": inv["content"], "design": inv["design"]}
         if parts[0] == "invitations" and parts[-1] == "details":
             inv = self.invitations[parts[1]]
-            return 200, {"id": inv["id"], "slug": inv["slug"], "is_active": inv["is_active"]}
+            return 200, {"id": inv["id"], "slug": inv["slug"], "is_active": inv["is_active"], "theme": inv["theme"],
+                         "content": inv["content"], "design": inv["design"]}
         if parts[0] == "invitations" and parts[-1] == "toggle":
             self.toggle_calls += 1
             inv = self.invitations[parts[1]]
