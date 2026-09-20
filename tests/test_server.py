@@ -168,3 +168,55 @@ async def test_tools_declare_read_only_hints(api, store):
         tools = {t.name: t for t in (await client.list_tools()).tools}
     assert tools["list_events"].annotations.read_only_hint is True
     assert tools["create_event"].annotations.read_only_hint is False
+
+
+# --- What the platform measures ------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_rsvp_summary_exposes_what_the_host_needs_to_follow_up(api, store):
+    """Seats, contact details, dates and the response rate were collected but never surfaced."""
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, summary = await call(client, "get_rsvps", {"invitation_id": "any"})
+
+    assert summary["answered"] == 1 and summary["pending"] == 1
+    assert summary["response_rate"] == "50%"
+    assert summary["event_date"].startswith("2026-12-12")
+    answer = summary["responses"][0]
+    assert answer["seats"] == 2 and answer["seats_allowed"] == 3
+    assert answer["invited_personally"] is True and answer["email"] == "ana@test.com"
+    assert summary["awaiting_reply"] == [{"name": "Tío Beto", "seats_allowed": 2}]
+
+
+@pytest.mark.anyio
+async def test_event_stats_add_up_every_invitation(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, event = await call(client, "create_event", {"event_type": "boda", "title": "Boda", "date": "2026-12-12"})
+        _, inv = await call(client, "create_invitation", {"event_id": event["event_id"]})
+        api.invitations[inv["invitation_id"]]["view_count"] = 37
+
+        _, stats = await call(client, "get_event_stats", {"event_id": event["event_id"]})
+
+    assert stats["views"] == 37 and stats["attending"] == 1 and stats["seats_confirmed"] == 2
+    assert stats["response_rate"] == "50%"
+    assert stats["invitations"][0]["views"] == 37
+
+
+@pytest.mark.anyio
+async def test_views_are_visible_on_the_invitation_itself(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, event = await call(client, "create_event", {"event_type": "boda", "title": "Boda", "date": "2026-12-12"})
+        _, inv = await call(client, "create_invitation", {"event_id": event["event_id"]})
+        api.invitations[inv["invitation_id"]]["view_count"] = 12
+        _, view = await call(client, "get_invitation", {"invitation_id": inv["invitation_id"]})
+    assert view["views"] == 12
+
+
+@pytest.mark.anyio
+async def test_connection_status_shows_the_account_limits(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, state = await call(client, "connection_status")
+    assert state["invitations_allowed"] == 5 and state["premium"] is True

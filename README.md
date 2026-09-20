@@ -81,7 +81,7 @@ sequenceDiagram
 | `create_photo_upload_link` | Write |
 | `customize_design`, `set_cover_photo`, `add_gallery_photos`, `set_music` | Write |
 | `add_guest`, `list_guests` | Write / Read |
-| `get_rsvps` | Read |
+| `get_rsvps`, `get_event_stats` | Read |
 
 Prompt: `guided_invitation` walks the user through event data, theme, photos, texts and
 guests one question at a time (a slash command in clients that support prompts).
@@ -95,6 +95,9 @@ guests one question at a time (a slash command in clients that support prompts).
   Without that, an agent asked to "change the colour" creates a duplicate and the shared link goes stale.
 - **The client model writes the invitation texts.** The platform's templates fill the rest, so no
   section is ever left blank and no extra LLM bill is added.
+- **Everything the platform already measures is reachable.** Views, seats allowed vs. confirmed,
+  who answered and when, contact details, response rate and per-event totals were all being
+  collected and only half-exposed; an agent that can't see them can't help the host follow up.
 - **No option lists live in this repo.** Event types and themes used to be duplicated here and
   drifted from the platform; every value is now validated against the served catalog, and a wrong
   one comes back with the real options.
