@@ -86,6 +86,9 @@ class FakeInvitaAI:
                     for i in self.invitations.values() if i["event_id"] == e["id"]
                 ],
             }
+        if parts == ["upload-tickets"] and method == "POST":
+            return 200, {"url": "https://invitaai.test/subir/tok123", "expira_en_minutos": 30,
+                         "maximo_fotos": 10, "destino": body["target"]}
         if parts == ["stock-photos"]:
             return 200, {
                 "photos": [{"label": "Rosa y dorado", "url": "https://cdn.test/rosa.png", "tags": ["boda"]}],

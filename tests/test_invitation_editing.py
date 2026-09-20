@@ -99,7 +99,8 @@ async def test_only_public_image_links_are_accepted(api, store, url):
         await connect(client, api)
         _, inv = await setup_invitation(client, api)
         status, text = await call(client, "cambiar_foto_portada", {"invitacion_id": inv["invitacion_id"], "url_foto": url})
-    assert status == "error" and "no es una imagen válida" in text
+    assert status == "error" and "no es una imagen pública válida" in text
+    assert "crear_link_para_subir_fotos" in text  # dead end -> next step
 
 
 # --- Guided flow ------------------------------------------------------------------------------
@@ -111,3 +112,17 @@ async def test_guided_prompt_interviews_the_user(api, store):
     script = result.messages[0].content.text
     assert "xv" in script and "una pregunta a la vez" in script.lower()
     assert "editar_invitacion" in script and "buscar_fotos" in script
+
+
+@pytest.mark.anyio
+async def test_upload_link_lets_the_user_send_their_own_photos(api, store):
+    """Agents can't receive files, so the tool hands the user a link instead."""
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        status, ticket = await call(client, "crear_link_para_subir_fotos", {
+            "invitacion_id": inv["invitacion_id"], "destino": "portada",
+        })
+    assert status == "ok"
+    assert ticket["link"].startswith("https://invitaai.test/subir/")
+    assert ticket["destino"] == "foto principal" and ticket["expira_en_minutos"] == 30

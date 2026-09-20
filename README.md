@@ -49,6 +49,7 @@ public API as the web app, so ownership checks and business rules are enforced s
 | `ver_invitacion` | Read |
 | `crear_invitacion`, `editar_invitacion`, `activar_invitacion` | Write |
 | `buscar_fotos` | Read |
+| `crear_link_para_subir_fotos` | Write |
 | `cambiar_foto_portada`, `agregar_fotos_galeria`, `poner_musica` | Write |
 | `agregar_invitado`, `listar_invitados` | Write / Read |
 | `ver_confirmaciones` | Read |
@@ -66,6 +67,9 @@ guests one question at a time (a slash command in clients that support prompts).
 - **The client model writes the invitation texts.** The platform's templates fill the rest, so no
   section is ever left blank and no extra LLM bill is added.
 - **Only public https image links** reach the invitation (`javascript:`, `http:` and non-images are rejected).
+- **The user's own photos travel by link, not through the model.** Tools can't receive files, so
+  `crear_link_para_subir_fotos` returns a short-lived, single-invitation upload link the user opens
+  on their phone. Errors about image URLs point the model at that tool instead of dead-ending.
 
 ## Install
 

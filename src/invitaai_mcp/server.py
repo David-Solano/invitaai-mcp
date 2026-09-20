@@ -34,6 +34,8 @@ Cómo acompañar al usuario:
 - Antes de crear una invitación, pregúntale por su estilo: tema, foto de portada
   (usa buscar_fotos para ofrecerle opciones con nombre), música y tono de los textos.
   Una pregunta a la vez; no inventes preferencias.
+- El usuario no puede pasarte archivos: si quiere usar sus propias fotos (del celular o la
+  computadora), usa crear_link_para_subir_fotos y dile que abra ese link. No le pidas una URL.
 - Los textos de la invitación los escribes tú, con la información del evento, y los
   mandas en crear_invitacion o editar_invitacion. Si no mandas textos, quedan plantillas genéricas.
 - Para cambiar algo de una invitación existente usa editar_invitacion. NUNCA crees otra
@@ -70,8 +72,9 @@ def _check_image_url(url: str) -> None:
     """Only public image links: keeps javascript:/data: and non-images out of the invitation."""
     if not url.startswith("https://") or not url.lower().split("?")[0].endswith(IMAGE_SUFFIXES):
         raise InvitaAIError(
-            f"'{url}' no es una imagen válida. Usa una URL https que termine en "
-            f"{', '.join(IMAGE_SUFFIXES)} (por ejemplo, una de buscar_fotos)."
+            f"'{url}' no es una imagen pública válida. Si la foto está en el teléfono o la "
+            "computadora del usuario, usa crear_link_para_subir_fotos y pásale el link; si no, "
+            f"usa una URL https que termine en {', '.join(IMAGE_SUFFIXES)} (por ejemplo, de buscar_fotos)."
         )
 
 
@@ -357,6 +360,24 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         return {
             "fotos": [{"nombre": p["label"], "url": p["url"]} for p in data["photos"]],
             "etiquetas_disponibles": data["tags"],
+        }
+
+    @tool(WRITE)
+    async def crear_link_para_subir_fotos(
+        invitacion_id: str, destino: Literal["portada", "galeria"] = "galeria"
+    ) -> dict:
+        """Genera un link para que el usuario suba SUS fotos desde el celular o la computadora.
+        Úsala siempre que quiera usar fotos propias: las herramientas no reciben archivos.
+        Pásale el link y espera a que te diga que terminó; luego confirma con ver_invitacion."""
+        ticket = await client.request(
+            "POST", "/api/upload-tickets", json={"invitation_id": invitacion_id, "target": destino}
+        )
+        return {
+            "link": ticket["url"],
+            "destino": "foto principal" if destino == "portada" else "galería",
+            "expira_en_minutos": ticket["expira_en_minutos"],
+            "maximo_fotos": ticket["maximo_fotos"],
+            "siguiente_paso": "Dile al usuario que abra el link, elija sus fotos y te avise al terminar.",
         }
 
     @tool(WRITE)
