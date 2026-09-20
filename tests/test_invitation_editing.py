@@ -222,3 +222,39 @@ async def test_spotify_warns_about_the_30_second_preview(api, store):
             "invitacion_id": inv["invitacion_id"], "link_de_la_cancion": "https://open.spotify.com/track/real",
         })
     assert "30 segundos" in music["nota"]
+
+
+# --- Location ----------------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_an_address_that_cannot_be_located_is_reported_back(api, store):
+    """The map button only appears when the address resolves, so the agent must know."""
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, event = await call(client, "crear_evento", {
+            "tipo": "cumpleanos", "titulo": "Cumple", "fecha": "2026-11-19",
+            "lugar": "Calle inventada 99999, Ciudad Falsa",
+        })
+    assert "No se pudo ubicar" in event["ubicacion"] and "Google Maps" in event["ubicacion"]
+
+
+@pytest.mark.anyio
+async def test_a_good_address_confirms_the_map(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, event = await call(client, "crear_evento", {
+            "tipo": "boda", "titulo": "Boda", "fecha": "2026-12-12", "lugar": "Parque España, Condesa, CDMX",
+        })
+        _, edited = await call(client, "editar_evento", {
+            "evento_id": event["evento_id"], "lugar": "Parque México, Condesa, CDMX",
+        })
+    assert "se ubicó" in event["ubicacion"] and "se ubicó" in edited["ubicacion"]
+    assert edited["actualizado"] == ["lugar"]
+
+
+@pytest.mark.anyio
+async def test_no_location_no_noise(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, event = await call(client, "crear_evento", {"tipo": "boda", "titulo": "Boda", "fecha": "2026-12-12"})
+    assert "ubicacion" not in event

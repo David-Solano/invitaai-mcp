@@ -82,6 +82,19 @@ def _es_hex(color: str) -> bool:
     return len(color) == 7 and color.startswith("#") and all(c in "0123456789abcdefABCDEF" for c in color[1:])
 
 
+def _aviso_ubicacion(encontrada: bool | None, lugar: str) -> dict:
+    """The invitation only shows a map button when the address could be located."""
+    if encontrada is None or not lugar:
+        return {}
+    if encontrada:
+        return {"ubicacion": "La dirección se ubicó en el mapa; la invitación mostrará el mapa y el botón."}
+    return {"ubicacion": (
+        f"No se pudo ubicar '{lugar}' en el mapa, así que la invitación no mostrará el botón de "
+        "ubicación. Pídele al usuario la dirección completa (calle, número, colonia, ciudad) o el "
+        "link del lugar en Google Maps."
+    )}
+
+
 def _check_image_url(url: str) -> None:
     """Only public image links: keeps javascript:/data: and non-images out of the invitation."""
     if not url.startswith("https://") or not url.lower().split("?")[0].endswith(IMAGE_SUFFIXES):
@@ -204,7 +217,11 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
             "event_type": tipo, "title": titulo, "event_date": fecha, "event_time": hora,
             "location": lugar, "location_url": link_mapa, "host_name": anfitrion, "description": descripcion,
         })
-        return {"evento_id": created["id"], "titulo": created["title"], "panel": client.link(f"/evento/{created['id']}")}
+        resultado = {
+            "evento_id": created["id"], "titulo": created["title"],
+            "panel": client.link(f"/evento/{created['id']}"),
+        }
+        return {**resultado, **_aviso_ubicacion(created.get("ubicacion_encontrada"), lugar)}
 
     @tool(WRITE)
     async def editar_evento(
@@ -218,15 +235,20 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         descripcion: str | None = None,
     ) -> dict:
         """Cambia solo los campos que indiques de un evento existente."""
-        fields = {
-            "title": titulo, "event_date": fecha, "event_time": hora, "location": lugar,
-            "location_url": link_mapa, "host_name": anfitrion, "description": descripcion,
+        pedidos = {
+            "titulo": (titulo, "title"), "fecha": (fecha, "event_date"), "hora": (hora, "event_time"),
+            "lugar": (lugar, "location"), "link_mapa": (link_mapa, "location_url"),
+            "anfitrion": (anfitrion, "host_name"), "descripcion": (descripcion, "description"),
         }
-        changes = {k: v for k, v in fields.items() if v is not None}
+        changes = {api: valor for valor, api in pedidos.values() if valor is not None}
         if not changes:
             raise InvitaAIError("Indica al menos un campo a cambiar.")
-        await client.request("PUT", f"/api/events/{evento_id}", json=changes)
-        return {"evento_id": evento_id, "actualizado": sorted(changes)}
+        actualizado = await client.request("PUT", f"/api/events/{evento_id}", json=changes)
+        return {
+            "evento_id": evento_id,
+            "actualizado": sorted(nombre for nombre, (valor, _) in pedidos.items() if valor is not None),
+            **_aviso_ubicacion(actualizado.get("ubicacion_encontrada"), lugar or ""),
+        }
 
     # --- Invitations ------------------------------------------------------------
 

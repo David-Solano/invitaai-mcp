@@ -100,6 +100,9 @@ guests one question at a time (a slash command in clients that support prompts).
   the agent can't drift from what exists — and `personalizar_diseno` applies a chosen combination
   plus a custom palette. Free-form CSS is deliberately not exposed: an invitation shown to guests
   shouldn't depend on a model writing stylesheets.
+- **Addresses are geocoded, and failures are reported.** A map button built from raw text opens an
+  empty search; the API resolves the address first and the tool tells the agent when it couldn't,
+  so it asks the user instead of leaving a dead button in front of the guests.
 - **Song links are verified, not trusted.** Models invent plausible YouTube/Spotify URLs, so
   `poner_musica` resolves the link through the provider's oEmbed endpoint: a fake link is refused
   and a real one supplies the actual track title. Spotify answers come with a note that guests

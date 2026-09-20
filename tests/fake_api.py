@@ -70,10 +70,12 @@ class FakeInvitaAI:
         if parts == ["events"] and method == "POST":
             eid = uuid.uuid4().hex
             self.events[eid] = {"id": eid, **body}
-            return 200, {"id": eid, "title": body["title"]}
+            ubicada = None if not body.get("location") else ("inventada" not in body["location"])
+            return 200, {"id": eid, "title": body["title"], "ubicacion_encontrada": ubicada}
         if parts[0] == "events" and len(parts) == 2 and method == "PUT":
             self.events[parts[1]].update(body)
-            return 200, {"ok": True}
+            ubicada = None if "location" not in body else ("inventada" not in body["location"])
+            return 200, {"ok": True, "ubicacion_encontrada": ubicada}
         if parts[0] == "events" and len(parts) == 2 and method == "GET":
             e = self.events[parts[1]]
             return 200, {
