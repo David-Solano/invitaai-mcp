@@ -284,6 +284,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
             "foto_portada": design.get("hero_image_url", ""),
             "fotos_galeria": design.get("gallery", []),
             "musica": design.get("music_title", ""),
+            "animacion_de_sobre": not design.get("skip_envelope", False),
             "link_publico": client.link(f"/i/{inv['slug']}"),
             "editar": client.link(f"/editar-invitacion/{inv['id']}"),
         }
@@ -411,14 +412,18 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         fuente_texto: str | None = None,
         layout: str | None = None,
         estilo_portada: str | None = None,
+        animacion_de_sobre: bool | None = None,
         color_principal: str | None = None,
         color_texto: str | None = None,
         color_fondo_arriba: str | None = None,
         color_fondo_abajo: str | None = None,
     ) -> dict:
         """Ajusta el diseño más allá del tema: textura, ornamento, tipografías, layout, estilo de
-        portada y paleta propia (colores en hex, ej. "#7A1535"). Usa las claves exactas de
-        ver_opciones_de_diseno. Solo cambia lo que mandes; lo demás se queda igual."""
+        portada, animación de sobre y paleta propia (colores en hex, ej. "#7A1535"). Usa las claves
+        exactas de ver_opciones_de_diseno. Solo cambia lo que mandes; lo demás se queda igual.
+
+        animacion_de_sobre=True abre la invitación con un sobre que el invitado destapa;
+        False la muestra directa."""
         cambios: dict = {}
         for valor, campo, seccion in (
             (textura, "texture", "texturas"),
@@ -430,6 +435,9 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         ):
             if valor is not None:
                 cambios[campo] = await _validar(valor, seccion)
+
+        if animacion_de_sobre is not None:
+            cambios["skip_envelope"] = not animacion_de_sobre
 
         colores = {
             "primary": color_principal, "text": color_texto,
