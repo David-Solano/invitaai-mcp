@@ -1,6 +1,6 @@
 [project]
 name = "invitaai-mcp"
-version = "0.7.0"
+version = "0.8.0"
 description = "MCP server to create and manage InvitaAI events and invitations from Claude Code, Codex or any MCP client."
 readme = "README.md"
 requires-python = ">=3.10"

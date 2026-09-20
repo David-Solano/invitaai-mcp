@@ -284,7 +284,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
             "foto_portada": design.get("hero_image_url", ""),
             "fotos_galeria": design.get("gallery", []),
             "musica": design.get("music_title", ""),
-            "animacion_de_sobre": not design.get("skip_envelope", False),
+            "apertura": design.get("opening") or ("directo" if design.get("skip_envelope") else "sobre"),
             "link_publico": client.link(f"/i/{inv['slug']}"),
             "editar": client.link(f"/editar-invitacion/{inv['id']}"),
         }
@@ -412,6 +412,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         fuente_texto: str | None = None,
         layout: str | None = None,
         estilo_portada: str | None = None,
+        apertura: str | None = None,
         animacion_de_sobre: bool | None = None,
         color_principal: str | None = None,
         color_texto: str | None = None,
@@ -422,8 +423,9 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         portada, animación de sobre y paleta propia (colores en hex, ej. "#7A1535"). Usa las claves
         exactas de ver_opciones_de_diseno. Solo cambia lo que mandes; lo demás se queda igual.
 
-        animacion_de_sobre=True abre la invitación con un sobre que el invitado destapa;
-        False la muestra directa."""
+        apertura define cómo abre la invitación ("sobre", "confeti", "petalos", "directo");
+        ofrécele las opciones con ver_opciones_de_diseno. animacion_de_sobre es el atajo antiguo:
+        True equivale a "sobre" y False a "directo"."""
         cambios: dict = {}
         for valor, campo, seccion in (
             (textura, "texture", "texturas"),
@@ -436,8 +438,10 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
             if valor is not None:
                 cambios[campo] = await _validar(valor, seccion)
 
-        if animacion_de_sobre is not None:
-            cambios["skip_envelope"] = not animacion_de_sobre
+        if apertura is not None:
+            cambios["opening"] = await _validar(apertura, "aperturas")
+        elif animacion_de_sobre is not None:
+            cambios["opening"] = "sobre" if animacion_de_sobre else "directo"
 
         colores = {
             "primary": color_principal, "text": color_texto,

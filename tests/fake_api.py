@@ -110,6 +110,7 @@ class FakeInvitaAI:
                 "fuentes_texto": [{"key": "'Lora', serif", "label": "Lora"}],
                 "layouts": [{"key": "clasico", "label": "Clásico"}, {"key": "minimal", "label": "Minimal"}],
                 "estilos_portada": [{"key": "overlay", "label": "Sobre la foto"}],
+                "aperturas": [{"key": k, "label": k} for k in ("sobre", "confeti", "petalos", "directo")],
             }
         if parts == ["stock-photos"]:
             return 200, {

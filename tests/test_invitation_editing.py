@@ -284,6 +284,24 @@ async def test_unknown_event_type_is_rejected(api, store):
 
 
 @pytest.mark.anyio
+async def test_the_opening_animation_can_be_chosen(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        iid = inv["invitacion_id"]
+        _, antes = await call(client, "ver_invitacion", {"invitacion_id": iid})
+
+        await call(client, "personalizar_diseno", {"invitacion_id": iid, "apertura": "confeti"})
+        _, con_confeti = await call(client, "ver_invitacion", {"invitacion_id": iid})
+
+        status, text = await call(client, "personalizar_diseno", {"invitacion_id": iid, "apertura": "fuegos"})
+
+    assert antes["apertura"] == "sobre"  # the envelope is still the default
+    assert con_confeti["apertura"] == "confeti"
+    assert status == "error" and "'petalos'" in text
+
+
+@pytest.mark.anyio
 async def test_the_envelope_animation_can_be_turned_off_and_on(api, store):
     async with Client(make_server(api, store)) as client:
         await connect(client, api)
@@ -298,7 +316,7 @@ async def test_the_envelope_animation_can_be_turned_off_and_on(api, store):
                                                    "textura": "lino"})
         _, con_sobre = await call(client, "ver_invitacion", {"invitacion_id": iid})
 
-    assert antes["animacion_de_sobre"] is True  # invitations open with the envelope by default
-    assert sin_sobre["animacion_de_sobre"] is False
-    assert con_sobre["animacion_de_sobre"] is True
+    assert antes["apertura"] == "sobre"  # invitations open with the envelope by default
+    assert sin_sobre["apertura"] == "directo"
+    assert con_sobre["apertura"] == "sobre"
     assert api.invitations[iid]["design"]["texture"] == "lino"  # other design values survive
