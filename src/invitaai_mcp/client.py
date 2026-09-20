@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable
 import anyio
 import httpx
 
-from .credentials import CredentialStore, Credentials, parse_expiry
+from .credentials import CredentialSource, Credentials, parse_expiry
 
 RENEWAL_WARNING_DAYS = 14
 
@@ -22,7 +22,7 @@ class InvitaAIClient:
     def __init__(
         self,
         base_url: str,
-        store: CredentialStore,
+        store: CredentialSource,
         http: httpx.AsyncClient | None = None,
         sleep: Callable[[float], Awaitable[None]] = anyio.sleep,
     ):

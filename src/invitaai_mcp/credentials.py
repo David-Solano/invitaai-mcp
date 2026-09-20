@@ -1,13 +1,17 @@
-"""Where the API token lives on the user's machine.
+"""Where the API token comes from.
 
-The token is a secret: stored in the user's home with owner-only permissions,
-never printed back to the model, never written to the MCP client config.
+Two modes, same tools:
+- local (stdio): the token lives in the user's home, owner-only permissions (CredentialStore).
+- remote (HTTP): the token arrives with each request, issued by the OAuth flow (RequestCredentials).
+
+Either way the token is a secret: never printed back to the model, never in the client config.
 """
 import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable, Protocol
 
 
 def default_path() -> Path:
@@ -26,6 +30,37 @@ class Credentials:
 
 def parse_expiry(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+class CredentialSource(Protocol):
+    """What the client needs to get (and keep) the user's token."""
+
+    def load(self) -> "Credentials | None": ...
+    def save(self, creds: "Credentials") -> None: ...
+    def update_expiry(self, expires_at: datetime) -> None: ...
+    def clear(self) -> None: ...
+
+
+class RequestCredentials:
+    """Remote mode: the token belongs to the HTTP request being served, not to a file.
+
+    Nothing is stored: the MCP client holds the token and sends it on every call.
+    """
+
+    def __init__(self, current: Callable[[], Credentials | None]):
+        self._current = current
+
+    def load(self) -> "Credentials | None":
+        return self._current()
+
+    def save(self, creds: "Credentials") -> None:  # the OAuth flow issues tokens, not the server
+        raise NotImplementedError("En modo remoto el token lo emite el flujo de OAuth.")
+
+    def update_expiry(self, expires_at: datetime) -> None:
+        pass
+
+    def clear(self) -> None:
+        pass
 
 
 class CredentialStore:

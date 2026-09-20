@@ -75,8 +75,19 @@ def _check_image_url(url: str) -> None:
         )
 
 
-def build_server(client: InvitaAIClient) -> MCPServer:
-    server = MCPServer("invitaai", instructions=INSTRUCTIONS)
+def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **server_kwargs: Any) -> MCPServer:
+    """con_login_local=False for the remote server, where OAuth already authenticated the user
+    and the connect/renew tools would be dead weight.
+
+    server_kwargs goes to MCPServer: the remote deployment passes its auth settings there.
+    """
+    instructions = INSTRUCTIONS if con_login_local else INSTRUCTIONS.replace(
+        "- Si una herramienta responde que no hay conexión, usa conectar_cuenta, muéstrale al\n"
+        "  usuario el link y el código, y después llama completar_conexion.",
+        "- Si una herramienta responde que el acceso no es válido, dile al usuario que vuelva a\n"
+        "  conectar InvitaAI desde los conectores de su app.",
+    )
+    server = MCPServer("invitaai", instructions=instructions, **server_kwargs)
 
     def tool(annotations: ToolAnnotations):
         """Registers a tool; API errors become ToolError text the model can act on,
@@ -97,26 +108,28 @@ def build_server(client: InvitaAIClient) -> MCPServer:
 
         return decorator
 
-    # --- Connection -----------------------------------------------------------
+    # --- Connection (local mode only; remotely the OAuth flow already did this) ----
 
-    @tool(WRITE)
-    async def conectar_cuenta(nombre_del_agente: str = "Agente MCP") -> dict:
-        """Conecta (o renueva) el acceso a la cuenta InvitaAI del usuario.
-        Devuelve un link y un código: el usuario debe abrir el link, confirmar el código y aprobar.
-        Después llama completar_conexion."""
-        login = await client.start_login(nombre_del_agente)
-        return {
-            **login,
-            "siguiente_paso": "Pide al usuario abrir el link, verificar el código y aprobar; luego llama completar_conexion.",
-        }
+    if con_login_local:
 
-    @tool(WRITE)
-    async def completar_conexion() -> dict:
-        """Espera (hasta ~1 minuto) a que el usuario apruebe la conexión en el navegador."""
-        if await client.finish_login():
-            me = await client.request("GET", "/api/me")
-            return {"conectado": True, "cuenta": me["email"]}
-        return {"conectado": False, "siguiente_paso": "El usuario aún no aprueba. Vuelve a llamar completar_conexion."}
+        @tool(WRITE)
+        async def conectar_cuenta(nombre_del_agente: str = "Agente MCP") -> dict:
+            """Conecta (o renueva) el acceso a la cuenta InvitaAI del usuario.
+            Devuelve un link y un código: el usuario debe abrir el link, confirmar el código y aprobar.
+            Después llama completar_conexion."""
+            login = await client.start_login(nombre_del_agente)
+            return {
+                **login,
+                "siguiente_paso": "Pide al usuario abrir el link, verificar el código y aprobar; luego llama completar_conexion.",
+            }
+
+        @tool(WRITE)
+        async def completar_conexion() -> dict:
+            """Espera (hasta ~1 minuto) a que el usuario apruebe la conexión en el navegador."""
+            if await client.finish_login():
+                me = await client.request("GET", "/api/me")
+                return {"conectado": True, "cuenta": me["email"]}
+            return {"conectado": False, "siguiente_paso": "El usuario aún no aprueba. Vuelve a llamar completar_conexion."}
 
     @tool(READ)
     async def estado_conexion() -> dict:
