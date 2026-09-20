@@ -43,6 +43,9 @@ Cómo acompañar al usuario:
 - Para cambiar algo de una invitación existente usa editar_invitacion. NUNCA crees otra
   invitación para aplicar un cambio: se duplican y el link anterior deja de ser el bueno.
 - Usa ver_invitacion antes de editar, para cambiar solo lo que el usuario pidió.
+- Si el usuario dice que el texto "no se lee" o "se pierde" sobre la foto, tienes tres palancas en
+  personalizar_diseno: color_texto_portada, oscurecer_foto y altura_texto_portada. Prueba una,
+  pídele que mire el link y ajusta; cambiar la portada a "texto debajo de la foto" es el último recurso.
 - Al terminar, comparte el link público y el link de edición.
 
 Reglas:
@@ -285,6 +288,12 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
             "fotos_galeria": design.get("gallery", []),
             "musica": design.get("music_title", ""),
             "apertura": design.get("opening") or ("directo" if design.get("skip_envelope") else "sobre"),
+            "portada": {
+                "color_del_texto": design.get("hero_text_color") or "auto",
+                "foto_oscurecida": design.get("hero_overlay", True),
+                "altura_del_texto": design.get("hero_text_y", 50),
+                "estilo": design.get("hero_layout", "below"),
+            },
             "link_publico": client.link(f"/i/{inv['slug']}"),
             "editar": client.link(f"/editar-invitacion/{inv['id']}"),
         }
@@ -414,6 +423,9 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         estilo_portada: str | None = None,
         apertura: str | None = None,
         animacion_de_sobre: bool | None = None,
+        color_texto_portada: str | None = None,
+        oscurecer_foto: bool | None = None,
+        altura_texto_portada: int | None = None,
         color_principal: str | None = None,
         color_texto: str | None = None,
         color_fondo_arriba: str | None = None,
@@ -425,7 +437,11 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
 
         apertura define cómo abre la invitación ("sobre", "confeti", "petalos", "directo");
         ofrécele las opciones con ver_opciones_de_diseno. animacion_de_sobre es el atajo antiguo:
-        True equivale a "sobre" y False a "directo"."""
+        True equivale a "sobre" y False a "directo".
+
+        Si el texto de la portada se pierde sobre la foto: color_texto_portada ("#ffffff",
+        "#1a1a1a" o "auto"), oscurecer_foto=True para poner un velo oscuro detrás del texto, y
+        altura_texto_portada (0-100) para moverlo a una zona más despejada de la imagen."""
         cambios: dict = {}
         for valor, campo, seccion in (
             (textura, "texture", "texturas"),
@@ -437,6 +453,22 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         ):
             if valor is not None:
                 cambios[campo] = await _validar(valor, seccion)
+
+        if color_texto_portada is not None:
+            if color_texto_portada.lower() in ("auto", ""):
+                cambios["hero_text_color"] = ""  # back to the theme's colour
+            elif _es_hex(color_texto_portada):
+                cambios["hero_text_color"] = color_texto_portada
+            else:
+                raise InvitaAIError(
+                    f"'{color_texto_portada}' no es válido. Usa un color hex (#RRGGBB) o 'auto'."
+                )
+        if oscurecer_foto is not None:
+            cambios["hero_overlay"] = oscurecer_foto
+        if altura_texto_portada is not None:
+            if not 0 <= altura_texto_portada <= 100:
+                raise InvitaAIError("altura_texto_portada va de 0 a 100 (50 = al centro).")
+            cambios["hero_text_y"] = altura_texto_portada
 
         if apertura is not None:
             cambios["opening"] = await _validar(apertura, "aperturas")

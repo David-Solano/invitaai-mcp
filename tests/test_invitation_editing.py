@@ -320,3 +320,49 @@ async def test_the_envelope_animation_can_be_turned_off_and_on(api, store):
     assert sin_sobre["apertura"] == "directo"
     assert con_sobre["apertura"] == "sobre"
     assert api.invitations[iid]["design"]["texture"] == "lino"  # other design values survive
+
+
+# --- Cover readability --------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_cover_text_can_be_made_readable_over_the_photo(api, store):
+    """"La letra se pierde con el fondo": colour, dark veil and position, without moving the text out."""
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        iid = inv["invitacion_id"]
+        await call(client, "personalizar_diseno", {
+            "invitacion_id": iid, "color_texto_portada": "#ffffff",
+            "oscurecer_foto": True, "altura_texto_portada": 35,
+        })
+        _, view = await call(client, "ver_invitacion", {"invitacion_id": iid})
+
+    design = api.invitations[iid]["design"]
+    assert design["hero_text_color"] == "#ffffff" and design["hero_overlay"] is True
+    assert design["hero_text_y"] == 35
+    assert view["portada"]["color_del_texto"] == "#ffffff"
+
+
+@pytest.mark.anyio
+async def test_cover_text_colour_can_go_back_to_the_theme(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        iid = inv["invitacion_id"]
+        await call(client, "personalizar_diseno", {"invitacion_id": iid, "color_texto_portada": "#ffffff"})
+        await call(client, "personalizar_diseno", {"invitacion_id": iid, "color_texto_portada": "auto"})
+        _, view = await call(client, "ver_invitacion", {"invitacion_id": iid})
+    assert view["portada"]["color_del_texto"] == "auto"
+
+
+@pytest.mark.parametrize("args,esperado", [
+    ({"color_texto_portada": "blanco"}, "hex"),
+    ({"altura_texto_portada": 140}, "0 a 100"),
+])
+@pytest.mark.anyio
+async def test_bad_cover_values_are_rejected(api, store, args, esperado):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        status, text = await call(client, "personalizar_diseno", {"invitacion_id": inv["invitacion_id"], **args})
+    assert status == "error" and esperado in text
