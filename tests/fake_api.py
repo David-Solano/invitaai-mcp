@@ -102,7 +102,8 @@ class FakeInvitaAI:
                                     "message": "Ese link no existe o no es público. Pide al usuario que copie el link desde su app de música."}}
         if parts == ["design-catalog"]:
             return 200, {
-                "temas": [{"key": "borgona", "label": "Borgoña"}],
+                "tipos_de_evento": [{"key": k, "label": k} for k in ("boda", "xv", "cumpleanos", "baby_shower")],
+                "temas": [{"key": k, "label": k} for k in ("perla", "champagne", "borgona", "noche")],
                 "texturas": [{"key": "lino", "label": "Lino"}, {"key": "none", "label": "Ninguna"}],
                 "ornamentos": [{"key": "floral", "label": "Floral"}, {"key": "", "label": "Ninguno"}],
                 "fuentes_titulos": [{"key": "'Great Vibes', cursive", "label": "Great Vibes"}],

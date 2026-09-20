@@ -15,16 +15,8 @@ from mcp.types import ToolAnnotations
 from .client import InvitaAIClient, InvitaAIError
 from .credentials import CredentialStore
 
-EventType = Literal[
-    "boda", "xv", "cumpleanos", "baby_shower", "bautizo",
-    "graduacion", "corporativo", "aniversario", "compromiso", "reunion",
-]
-Theme = Literal[
-    "perla", "rosa_polvo", "salvia", "cielo", "terracota", "lavanda", "noche", "carbon",
-    "borgona", "champagne", "navy", "verde_botella", "dusty_blue", "tiffany", "rosa_dorado",
-    "princesa", "fucsia", "lila_plata", "turquesa", "azul_real",
-    "glamour", "coral", "menta", "noche_plata",
-]
+# Event types and themes used to be copied here. They live in the platform's catalog
+# (ver_opciones_de_diseno) and are validated against it, so adding a theme there is enough.
 
 INSTRUCTIONS = """\
 Herramientas para crear y administrar eventos e invitaciones digitales en InvitaAI
@@ -203,7 +195,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
 
     @tool(WRITE)
     async def crear_evento(
-        tipo: EventType,
+        tipo: str,
         titulo: str,
         fecha: str,
         hora: str = "",
@@ -212,7 +204,9 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         anfitrion: str = "",
         descripcion: str = "",
     ) -> dict:
-        """Crea un evento. fecha en formato AAAA-MM-DD; hora libre (ej. "18:00")."""
+        """Crea un evento. fecha en formato AAAA-MM-DD; hora libre (ej. "18:00").
+        Los tipos válidos están en ver_opciones_de_diseno ("tipos_de_evento")."""
+        await _validar(tipo, "tipos_de_evento")
         created = await client.request("POST", "/api/events", json={
             "event_type": tipo, "title": titulo, "event_date": fecha, "event_time": hora,
             "location": lugar, "location_url": link_mapa, "host_name": anfitrion, "description": descripcion,
@@ -255,6 +249,16 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
     async def _details(invitacion_id: str) -> dict:
         return await client.request("GET", f"/api/invitations/{invitacion_id}/details")
 
+    async def _validar(valor: str, seccion: str) -> str:
+        """Checks a value against the platform's catalog and, when wrong, hands the model the
+        real options instead of a bare rejection."""
+        catalogo = await client.request("GET", "/api/design-catalog")
+        claves = {op["key"] for op in catalogo[seccion]}
+        if valor not in claves:
+            opciones = ", ".join(f"'{c}'" for c in sorted(claves) if c)
+            raise InvitaAIError(f"'{valor}' no es válido para {seccion}. Opciones: {opciones}.")
+        return valor
+
     def _texts(textos: dict) -> dict:
         """Spanish arguments -> content fields, dropping the ones the caller didn't send."""
         return {CONTENT_FIELDS[k]: v for k, v in textos.items() if v is not None}
@@ -287,7 +291,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
     @tool(WRITE)
     async def crear_invitacion(
         evento_id: str,
-        tema: Theme = "perla",
+        tema: str = "perla",
         titulo_principal: str | None = None,
         subtitulo: str | None = None,
         mensaje: str | None = None,
@@ -298,6 +302,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
     ) -> dict:
         """Crea la invitación digital de un evento. Escribe tú los textos con la información
         del evento y el tono que pidió el usuario; si no los mandas, quedan plantillas genéricas."""
+        await _validar(tema, "temas")
         event = await client.request("GET", f"/api/events/{evento_id}")
         if event["invitations"]:
             existing = event["invitations"][0]
@@ -326,7 +331,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
     @tool(WRITE)
     async def editar_invitacion(
         invitacion_id: str,
-        tema: Theme | None = None,
+        tema: str | None = None,
         titulo_principal: str | None = None,
         subtitulo: str | None = None,
         mensaje: str | None = None,
@@ -348,7 +353,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
 
         body: dict = {}
         if tema is not None:
-            body["theme"] = tema
+            body["theme"] = await _validar(tema, "temas")
         if changes:
             content = dict((await _details(invitacion_id)).get("content") or {})
             content.update(changes)  # merge: never drop the texts the user isn't changing
@@ -414,15 +419,6 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         """Ajusta el diseño más allá del tema: textura, ornamento, tipografías, layout, estilo de
         portada y paleta propia (colores en hex, ej. "#7A1535"). Usa las claves exactas de
         ver_opciones_de_diseno. Solo cambia lo que mandes; lo demás se queda igual."""
-        catalogo = await client.request("GET", "/api/design-catalog")
-
-        def validar(valor: str, seccion: str) -> str:
-            claves = {op["key"] for op in catalogo[seccion]}
-            if valor not in claves:
-                opciones = ", ".join(f"'{c}'" for c in sorted(claves) if c)
-                raise InvitaAIError(f"'{valor}' no es válido para {seccion}. Opciones: {opciones}.")
-            return valor
-
         cambios: dict = {}
         for valor, campo, seccion in (
             (textura, "texture", "texturas"),
@@ -433,7 +429,7 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
             (estilo_portada, "hero_layout", "estilos_portada"),
         ):
             if valor is not None:
-                cambios[campo] = validar(valor, seccion)
+                cambios[campo] = await _validar(valor, seccion)
 
         colores = {
             "primary": color_principal, "text": color_texto,

@@ -258,3 +258,26 @@ async def test_no_location_no_noise(api, store):
         await connect(client, api)
         _, event = await call(client, "crear_evento", {"tipo": "boda", "titulo": "Boda", "fecha": "2026-12-12"})
     assert "ubicacion" not in event
+
+
+@pytest.mark.anyio
+async def test_unknown_theme_is_rejected_with_the_real_list(api, store):
+    """Themes are no longer copied into the MCP: they are checked against the platform catalog."""
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, event = await call(client, "crear_evento", {"tipo": "boda", "titulo": "B", "fecha": "2026-12-12"})
+        status, text = await call(client, "crear_invitacion", {
+            "evento_id": event["evento_id"], "tema": "tema_inventado",
+        })
+    assert status == "error" and "'champagne'" in text and "no es válido para temas" in text
+
+
+@pytest.mark.anyio
+async def test_unknown_event_type_is_rejected(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        status, text = await call(client, "crear_evento", {
+            "tipo": "posada", "titulo": "Posada", "fecha": "2026-12-20",
+        })
+    assert status == "error" and "tipos_de_evento" in text
+    assert api.events == {}

@@ -95,6 +95,9 @@ guests one question at a time (a slash command in clients that support prompts).
   Without that, an agent asked to "change the colour" creates a duplicate and the shared link goes stale.
 - **The client model writes the invitation texts.** The platform's templates fill the rest, so no
   section is ever left blank and no extra LLM bill is added.
+- **No option lists live in this repo.** Event types and themes used to be duplicated here and
+  drifted from the platform; every value is now validated against the served catalog, and a wrong
+  one comes back with the real options.
 - **The agent designs, within a catalog.** `ver_opciones_de_diseno` returns the themes, textures,
   ornaments, fonts, layouts and cover styles the platform actually renders — served by the app, so
   the agent can't drift from what exists — and `personalizar_diseno` applies a chosen combination
