@@ -34,6 +34,11 @@ Cómo acompañar al usuario:
 - Antes de crear una invitación, pregúntale por su estilo: tema, foto de portada
   (usa buscar_fotos para ofrecerle opciones con nombre), música y tono de los textos.
   Una pregunta a la vez; no inventes preferencias.
+- Eres el diseñador: con ver_opciones_de_diseno arma 2 o 3 propuestas completas (tema +
+  tipografías + textura + ornamento + paleta), ponles nombre, descríbeselas en palabras y deja
+  que elija. Aplica la elegida con personalizar_diseno y pídele que abra el link para opinar.
+- No ves la invitación renderizada. Después de cada cambio pide al usuario que la mire y te diga
+  qué ajustar; itera con él en vez de suponer que quedó bien.
 - El usuario no puede pasarte archivos: si quiere usar sus propias fotos (del celular o la
   computadora), usa crear_link_para_subir_fotos y dile que abra ese link. No le pidas una URL.
 - Los textos de la invitación los escribes tú, con la información del evento, y los
@@ -66,6 +71,10 @@ READ = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True)
 
 IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+
+
+def _es_hex(color: str) -> bool:
+    return len(color) == 7 and color.startswith("#") and all(c in "0123456789abcdefABCDEF" for c in color[1:])
 
 
 def _check_image_url(url: str) -> None:
@@ -351,6 +360,78 @@ def build_server(client: InvitaAIClient, *, con_login_local: bool = True, **serv
         }
 
     # --- Photos and music -----------------------------------------------------------
+
+    # --- Design ---------------------------------------------------------------------
+
+    @tool(READ)
+    async def ver_opciones_de_diseno() -> dict:
+        """Catálogo de diseño: temas, texturas, ornamentos, tipografías, layouts y estilos de portada,
+        cada uno con su descripción. Úsalo para PROPONERLE al usuario 2 o 3 estilos concretos
+        (por nombre y en palabras) antes de aplicar nada."""
+        return await client.request("GET", "/api/design-catalog")
+
+    @tool(WRITE)
+    async def personalizar_diseno(
+        invitacion_id: str,
+        textura: str | None = None,
+        ornamento: str | None = None,
+        fuente_titulos: str | None = None,
+        fuente_texto: str | None = None,
+        layout: str | None = None,
+        estilo_portada: str | None = None,
+        color_principal: str | None = None,
+        color_texto: str | None = None,
+        color_fondo_arriba: str | None = None,
+        color_fondo_abajo: str | None = None,
+    ) -> dict:
+        """Ajusta el diseño más allá del tema: textura, ornamento, tipografías, layout, estilo de
+        portada y paleta propia (colores en hex, ej. "#7A1535"). Usa las claves exactas de
+        ver_opciones_de_diseno. Solo cambia lo que mandes; lo demás se queda igual."""
+        catalogo = await client.request("GET", "/api/design-catalog")
+
+        def validar(valor: str, seccion: str) -> str:
+            claves = {op["key"] for op in catalogo[seccion]}
+            if valor not in claves:
+                opciones = ", ".join(f"'{c}'" for c in sorted(claves) if c)
+                raise InvitaAIError(f"'{valor}' no es válido para {seccion}. Opciones: {opciones}.")
+            return valor
+
+        cambios: dict = {}
+        for valor, campo, seccion in (
+            (textura, "texture", "texturas"),
+            (ornamento, "decoration", "ornamentos"),
+            (fuente_titulos, "font_decorative", "fuentes_titulos"),
+            (fuente_texto, "font_body", "fuentes_texto"),
+            (layout, "layout", "layouts"),
+            (estilo_portada, "hero_layout", "estilos_portada"),
+        ):
+            if valor is not None:
+                cambios[campo] = validar(valor, seccion)
+
+        colores = {
+            "primary": color_principal, "text": color_texto,
+            "bg_start": color_fondo_arriba, "bg_end": color_fondo_abajo,
+        }
+        elegidos = {k: v for k, v in colores.items() if v is not None}
+        for nombre, valor in elegidos.items():
+            if not _es_hex(valor):
+                raise InvitaAIError(f"'{valor}' no es un color hex válido (usa formato #RRGGBB).")
+        if elegidos:
+            actual = dict(((await _details(invitacion_id)).get("design") or {}).get("custom_colors") or {})
+            actual.update(elegidos)
+            cambios["custom_colors"] = actual
+
+        if not cambios:
+            raise InvitaAIError("Indica al menos un elemento del diseño a cambiar.")
+
+        await _update_design(invitacion_id, cambios)
+        inv = await _details(invitacion_id)
+        return {
+            "invitacion_id": invitacion_id,
+            "aplicado": sorted(cambios),
+            "link_publico": client.link(f"/i/{inv['slug']}"),
+            "siguiente_paso": "Pídele al usuario que abra el link y te diga qué ajustar. No ves la invitación: guíate por lo que te describa.",
+        }
 
     @tool(READ)
     async def buscar_fotos(etiqueta: str = "") -> dict:

@@ -77,9 +77,9 @@ sequenceDiagram
 | `crear_evento`, `editar_evento` | Write |
 | `ver_invitacion` | Read |
 | `crear_invitacion`, `editar_invitacion`, `activar_invitacion` | Write |
-| `buscar_fotos` | Read |
+| `ver_opciones_de_diseno`, `buscar_fotos` | Read |
 | `crear_link_para_subir_fotos` | Write |
-| `cambiar_foto_portada`, `agregar_fotos_galeria`, `poner_musica` | Write |
+| `personalizar_diseno`, `cambiar_foto_portada`, `agregar_fotos_galeria`, `poner_musica` | Write |
 | `agregar_invitado`, `listar_invitados` | Write / Read |
 | `ver_confirmaciones` | Read |
 
@@ -95,6 +95,13 @@ guests one question at a time (a slash command in clients that support prompts).
   Without that, an agent asked to "change the colour" creates a duplicate and the shared link goes stale.
 - **The client model writes the invitation texts.** The platform's templates fill the rest, so no
   section is ever left blank and no extra LLM bill is added.
+- **The agent designs, within a catalog.** `ver_opciones_de_diseno` returns the themes, textures,
+  ornaments, fonts, layouts and cover styles the platform actually renders — served by the app, so
+  the agent can't drift from what exists — and `personalizar_diseno` applies a chosen combination
+  plus a custom palette. Free-form CSS is deliberately not exposed: an invitation shown to guests
+  shouldn't depend on a model writing stylesheets.
+- **The agent is blind to the result.** Its instructions say so: propose named looks, apply, and ask
+  the user to open the link and react. The loop is human-in-the-eye, not guesswork.
 - **Only public https image links** reach the invitation (`javascript:`, `http:` and non-images are rejected).
 - **The user's own photos travel by link, not through the model.** Tools can't receive files, so
   `crear_link_para_subir_fotos` returns a short-lived, single-invitation upload link the user opens

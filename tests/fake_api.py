@@ -89,6 +89,16 @@ class FakeInvitaAI:
         if parts == ["upload-tickets"] and method == "POST":
             return 200, {"url": "https://invitaai.test/subir/tok123", "expira_en_minutos": 30,
                          "maximo_fotos": 10, "destino": body["target"]}
+        if parts == ["design-catalog"]:
+            return 200, {
+                "temas": [{"key": "borgona", "label": "Borgoña"}],
+                "texturas": [{"key": "lino", "label": "Lino"}, {"key": "none", "label": "Ninguna"}],
+                "ornamentos": [{"key": "floral", "label": "Floral"}, {"key": "", "label": "Ninguno"}],
+                "fuentes_titulos": [{"key": "'Great Vibes', cursive", "label": "Great Vibes"}],
+                "fuentes_texto": [{"key": "'Lora', serif", "label": "Lora"}],
+                "layouts": [{"key": "clasico", "label": "Clásico"}, {"key": "minimal", "label": "Minimal"}],
+                "estilos_portada": [{"key": "overlay", "label": "Sobre la foto"}],
+            }
         if parts == ["stock-photos"]:
             return 200, {
                 "photos": [{"label": "Rosa y dorado", "url": "https://cdn.test/rosa.png", "tags": ["boda"]}],

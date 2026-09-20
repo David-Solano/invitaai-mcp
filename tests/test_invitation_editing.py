@@ -126,3 +126,59 @@ async def test_upload_link_lets_the_user_send_their_own_photos(api, store):
     assert status == "ok"
     assert ticket["link"].startswith("https://invitaai.test/subir/")
     assert ticket["destino"] == "foto principal" and ticket["expira_en_minutos"] == 30
+
+
+# --- Design freedom ---------------------------------------------------------------------------
+
+@pytest.mark.anyio
+async def test_agent_can_read_the_design_catalog(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, catalogo = await call(client, "ver_opciones_de_diseno")
+    assert catalogo["texturas"][0]["label"] == "Lino"
+    assert "fuentes_titulos" in catalogo and "estilos_portada" in catalogo
+
+
+@pytest.mark.anyio
+async def test_design_changes_merge_and_keep_photos(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        iid = inv["invitacion_id"]
+        await call(client, "cambiar_foto_portada", {"invitacion_id": iid, "url_foto": "https://cdn.test/rosa.png"})
+        _, applied = await call(client, "personalizar_diseno", {
+            "invitacion_id": iid, "textura": "lino", "ornamento": "floral",
+            "fuente_titulos": "'Great Vibes', cursive", "color_principal": "#7A1535",
+        })
+        _, view = await call(client, "ver_invitacion", {"invitacion_id": iid})
+
+    design = api.invitations[inv["invitacion_id"]]["design"]
+    assert design["texture"] == "lino" and design["decoration"] == "floral"
+    assert design["custom_colors"] == {"primary": "#7A1535"}
+    assert view["foto_portada"] == "https://cdn.test/rosa.png"  # design edits don't wipe the photo
+    assert applied["link_publico"] == inv["link_publico"]
+
+
+@pytest.mark.anyio
+async def test_a_second_color_is_added_without_losing_the_first(api, store):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        iid = inv["invitacion_id"]
+        await call(client, "personalizar_diseno", {"invitacion_id": iid, "color_principal": "#7A1535"})
+        await call(client, "personalizar_diseno", {"invitacion_id": iid, "color_texto": "#250812"})
+    assert api.invitations[iid]["design"]["custom_colors"] == {"primary": "#7A1535", "text": "#250812"}
+
+
+@pytest.mark.parametrize("args,esperado", [
+    ({"textura": "terciopelo"}, "no es válido para texturas"),
+    ({"color_principal": "vino tinto"}, "color hex válido"),
+    ({}, "al menos un elemento"),
+])
+@pytest.mark.anyio
+async def test_invalid_design_values_are_rejected_with_the_options(api, store, args, esperado):
+    async with Client(make_server(api, store)) as client:
+        await connect(client, api)
+        _, inv = await setup_invitation(client, api)
+        status, text = await call(client, "personalizar_diseno", {"invitacion_id": inv["invitacion_id"], **args})
+    assert status == "error" and esperado in text
