@@ -102,15 +102,15 @@ class FakeInvitaAI:
                                     "message": "Ese link no existe o no es público. Pide al usuario que copie el link desde su app de música."}}
         if parts == ["design-catalog"]:
             return 200, {
-                "tipos_de_evento": [{"key": k, "label": k} for k in ("boda", "xv", "cumpleanos", "baby_shower")],
-                "temas": [{"key": k, "label": k} for k in ("perla", "champagne", "borgona", "noche")],
-                "texturas": [{"key": "lino", "label": "Lino"}, {"key": "none", "label": "Ninguna"}],
-                "ornamentos": [{"key": "floral", "label": "Floral"}, {"key": "", "label": "Ninguno"}],
-                "fuentes_titulos": [{"key": "'Great Vibes', cursive", "label": "Great Vibes"}],
-                "fuentes_texto": [{"key": "'Lora', serif", "label": "Lora"}],
+                "event_types": [{"key": k, "label": k} for k in ("boda", "xv", "cumpleanos", "baby_shower")],
+                "themes": [{"key": k, "label": k} for k in ("perla", "champagne", "borgona", "noche")],
+                "textures": [{"key": "lino", "label": "Lino"}, {"key": "none", "label": "Ninguna"}],
+                "ornaments": [{"key": "floral", "label": "Floral"}, {"key": "", "label": "Ninguno"}],
+                "title_fonts": [{"key": "'Great Vibes', cursive", "label": "Great Vibes"}],
+                "body_fonts": [{"key": "'Lora', serif", "label": "Lora"}],
                 "layouts": [{"key": "clasico", "label": "Clásico"}, {"key": "minimal", "label": "Minimal"}],
-                "estilos_portada": [{"key": "overlay", "label": "Sobre la foto"}],
-                "aperturas": [{"key": k, "label": k} for k in ("sobre", "confeti", "petalos", "directo")],
+                "cover_styles": [{"key": "overlay", "label": "Sobre la foto"}],
+                "openings": [{"key": k, "label": k} for k in ("sobre", "confeti", "petalos", "directo")],
             }
         if parts == ["stock-photos"]:
             return 200, {

@@ -64,26 +64,26 @@ sequenceDiagram
 | `device_code` and token never returned to the model | Tool outputs contain links and codes for the user, never secrets. |
 | Local token file created with `0600`; remotely the token only lives in the request | Nothing readable is left behind on either path. |
 | No destructive tools (delete event/guest) and no local file access | Limits damage from prompt injection. |
-| Guest RSVP messages returned as `mensaje_del_invitado` and flagged in the instructions | Third-party text is data, not instructions. |
+| Guest RSVP messages returned as `guest_message` and flagged in the instructions | Third-party text is data, not instructions. |
 | Event type and theme are enums in the tool schema | Invalid values are rejected before reaching the API. |
 
 ## Tools
 
 | Tool | Type |
 |---|---|
-| `conectar_cuenta`, `completar_conexion` | Connect or renew access (local mode only) |
-| `estado_conexion` | Read |
-| `listar_eventos`, `ver_evento` | Read |
-| `crear_evento`, `editar_evento` | Write |
-| `ver_invitacion` | Read |
-| `crear_invitacion`, `editar_invitacion`, `activar_invitacion` | Write |
-| `ver_opciones_de_diseno`, `buscar_fotos` | Read |
-| `crear_link_para_subir_fotos` | Write |
-| `personalizar_diseno`, `cambiar_foto_portada`, `agregar_fotos_galeria`, `poner_musica` | Write |
-| `agregar_invitado`, `listar_invitados` | Write / Read |
-| `ver_confirmaciones` | Read |
+| `connect_account`, `finish_connection` | Connect or renew access (local mode only) |
+| `connection_status` | Read |
+| `list_events`, `get_event` | Read |
+| `create_event`, `update_event` | Write |
+| `get_invitation` | Read |
+| `create_invitation`, `update_invitation`, `set_invitation_active` | Write |
+| `get_design_options`, `search_photos` | Read |
+| `create_photo_upload_link` | Write |
+| `customize_design`, `set_cover_photo`, `add_gallery_photos`, `set_music` | Write |
+| `add_guest`, `list_guests` | Write / Read |
+| `get_rsvps` | Read |
 
-Prompt: `crear_invitacion_guiada` walks the user through event data, theme, photos, texts and
+Prompt: `guided_invitation` walks the user through event data, theme, photos, texts and
 guests one question at a time (a slash command in clients that support prompts).
 
 ### Design notes
@@ -91,30 +91,30 @@ guests one question at a time (a slash command in clients that support prompts).
 - **Edits merge, never replace.** The API stores invitation texts and design as whole objects,
   so every edit tool reads the current one and writes back only the requested change. Changing
   the music can't wipe the gallery.
-- **Creating a second invitation for an event is refused**, pointing the model at `editar_invitacion`.
+- **Creating a second invitation for an event is refused**, pointing the model at `update_invitation`.
   Without that, an agent asked to "change the colour" creates a duplicate and the shared link goes stale.
 - **The client model writes the invitation texts.** The platform's templates fill the rest, so no
   section is ever left blank and no extra LLM bill is added.
 - **No option lists live in this repo.** Event types and themes used to be duplicated here and
   drifted from the platform; every value is now validated against the served catalog, and a wrong
   one comes back with the real options.
-- **The agent designs, within a catalog.** `ver_opciones_de_diseno` returns the themes, textures,
+- **The agent designs, within a catalog.** `get_design_options` returns the themes, textures,
   ornaments, fonts, layouts and cover styles the platform actually renders — served by the app, so
-  the agent can't drift from what exists — and `personalizar_diseno` applies a chosen combination
+  the agent can't drift from what exists — and `customize_design` applies a chosen combination
   plus a custom palette. Free-form CSS is deliberately not exposed: an invitation shown to guests
   shouldn't depend on a model writing stylesheets.
 - **Addresses are geocoded, and failures are reported.** A map button built from raw text opens an
   empty search; the API resolves the address first and the tool tells the agent when it couldn't,
   so it asks the user instead of leaving a dead button in front of the guests.
 - **Song links are verified, not trusted.** Models invent plausible YouTube/Spotify URLs, so
-  `poner_musica` resolves the link through the provider's oEmbed endpoint: a fake link is refused
+  `set_music` resolves the link through the provider's oEmbed endpoint: a fake link is refused
   and a real one supplies the actual track title. Spotify answers come with a note that guests
   without a session only hear a 30-second preview.
 - **The agent is blind to the result.** Its instructions say so: propose named looks, apply, and ask
   the user to open the link and react. The loop is human-in-the-eye, not guesswork.
 - **Only public https image links** reach the invitation (`javascript:`, `http:` and non-images are rejected).
 - **The user's own photos travel by link, not through the model.** Tools can't receive files, so
-  `crear_link_para_subir_fotos` returns a short-lived, single-invitation upload link the user opens
+  `create_photo_upload_link` returns a short-lived, single-invitation upload link the user opens
   on their phone. Errors about image URLs point the model at that tool instead of dead-ending.
 
 ## Use it
@@ -133,7 +133,7 @@ claude mcp add invitaai -- /absolute/path/to/.venv/bin/invitaai-mcp
 
 Then ask your agent: *"conéctame a InvitaAI"*. `INVITAAI_URL` points it at another deployment (e.g. local dev).
 
-The deployment mounts this package with `build_server(client, con_login_local=False)`, which drops the two
+The deployment mounts this package with `build_server(client, with_local_login=False)`, which drops the two
 device-login tools (OAuth already authenticated the user) and takes the token from the request instead of a file.
 
 ## Development
@@ -144,6 +144,9 @@ pytest
 ```
 
 Tests drive the server through the MCP protocol (in-memory client) against a fake of the InvitaAI API.
+
+Tool names, arguments and results are in English; the strings a person reads (errors, notes the
+assistant relays) stay in Spanish, the product's language.
 
 Built with Claude Code as a pair programmer; design decisions and review by the author.
 

@@ -52,10 +52,10 @@ class InvitaAIClient:
     async def finish_login(self, wait_seconds: int = 60) -> bool:
         """Polls until the user approves. True = connected, False = still waiting (call again)."""
         if not self._pending:
-            raise InvitaAIError("No hay una conexión en curso. Usa primero la herramienta conectar_cuenta.")
+            raise InvitaAIError("No hay una conexión en curso. Usa primero la herramienta connect_account.")
         if datetime.now(timezone.utc) >= self._pending["deadline"]:
             self._pending = None
-            raise InvitaAIError("El código expiró. Usa conectar_cuenta para generar uno nuevo.")
+            raise InvitaAIError("El código expiró. Usa connect_account para generar uno nuevo.")
         waited = 0
         while True:
             r = await self.http.post(
@@ -74,7 +74,7 @@ class InvitaAIClient:
                 self._pending = None
                 messages = {
                     "access_denied": "El usuario rechazó la conexión en el navegador.",
-                    "expired_token": "El código expiró. Usa conectar_cuenta para generar uno nuevo.",
+                    "expired_token": "El código expiró. Usa connect_account para generar uno nuevo.",
                 }
                 raise InvitaAIError(messages.get(error, "No se pudo completar la conexión. Intenta de nuevo."))
 
@@ -88,7 +88,7 @@ class InvitaAIClient:
     async def request(self, method: str, path: str, json: Any = None) -> Any:
         creds = self.store.load()
         if not creds:
-            raise InvitaAIError("No estás conectado a InvitaAI. Usa la herramienta conectar_cuenta.")
+            raise InvitaAIError("No estás conectado a InvitaAI. Usa la herramienta connect_account.")
 
         r = await self.http.request(
             method, f"{self.base_url}{path}", json=json, headers={"Authorization": f"Bearer {creds.token}"}
@@ -99,10 +99,10 @@ class InvitaAIClient:
         if r.status_code == 401:
             detail = _detail(r)
             if isinstance(detail, dict) and detail.get("error") == "token_expired":
-                raise InvitaAIError("Tu acceso a InvitaAI venció. Usa conectar_cuenta para renovarlo.")
+                raise InvitaAIError("Tu acceso a InvitaAI venció. Usa connect_account para renovarlo.")
             # Revoked or invalid: forget it locally so the next step is a clean reconnect.
             self.store.clear()
-            raise InvitaAIError("Tu acceso fue revocado o no es válido. Usa conectar_cuenta para conectarte de nuevo.")
+            raise InvitaAIError("Tu acceso fue revocado o no es válido. Usa connect_account para conectarte de nuevo.")
         if r.status_code >= 400:
             detail = _detail(r)
             text = detail.get("message") if isinstance(detail, dict) else detail
@@ -114,7 +114,7 @@ class InvitaAIClient:
         if creds and creds.days_left() <= RENEWAL_WARNING_DAYS:
             return (
                 f"Tu acceso a InvitaAI vence en {creds.days_left()} días. "
-                "Díselo al usuario y ofrécele renovarlo con conectar_cuenta."
+                "Díselo al usuario y ofrécele renovarlo con connect_account."
             )
         return None
 

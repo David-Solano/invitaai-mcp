@@ -51,11 +51,11 @@ async def call(client, name, args=None):
 
 
 async def connect(client, api):
-    status, login = await call(client, "conectar_cuenta", {"nombre_del_agente": "Claude Code"})
+    status, login = await call(client, "connect_account", {"agent_name": "Claude Code"})
     assert status == "ok"
     api.approve_all()
-    status, done = await call(client, "completar_conexion")
-    assert status == "ok" and done["conectado"]
+    status, done = await call(client, "finish_connection")
+    assert status == "ok" and done["connected"]
     return login
 
 
@@ -64,22 +64,22 @@ async def connect(client, api):
 @pytest.mark.anyio
 async def test_tools_require_connection(api, store):
     async with Client(make_server(api, store)) as client:
-        status, text = await call(client, "listar_eventos")
-    assert status == "error" and "conectar_cuenta" in text
+        status, text = await call(client, "list_events")
+    assert status == "error" and "connect_account" in text
 
 
 @pytest.mark.anyio
 async def test_connect_flow_never_exposes_secrets_to_the_model(api, store):
     async with Client(make_server(api, store)) as client:
-        status, login = await call(client, "conectar_cuenta")
-        assert set(login) >= {"link", "codigo"} and "device_code" not in login
+        status, login = await call(client, "connect_account")
+        assert set(login) >= {"link", "code"} and "device_code" not in login
 
-        status, pending = await call(client, "completar_conexion")
-        assert status == "ok" and pending["conectado"] is False  # user hasn't approved yet
+        status, pending = await call(client, "finish_connection")
+        assert status == "ok" and pending["connected"] is False  # user hasn't approved yet
 
         api.approve_all()
-        status, done = await call(client, "completar_conexion")
-        assert done == {"conectado": True, "cuenta": "david@test.com"}
+        status, done = await call(client, "finish_connection")
+        assert done == {"connected": True, "account": "david@test.com"}
         assert "inv_" not in str(done)
     assert store.load().token.startswith("inv_")
 
@@ -90,22 +90,22 @@ async def test_connect_flow_never_exposes_secrets_to_the_model(api, store):
 async def test_create_event_invitation_and_guest(api, store):
     async with Client(make_server(api, store)) as client:
         await connect(client, api)
-        _, event = await call(client, "crear_evento", {"tipo": "boda", "titulo": "Boda Ana y Luis", "fecha": "2026-12-12"})
-        _, inv = await call(client, "crear_invitacion", {"evento_id": event["evento_id"], "tema": "champagne"})
-        assert inv["link_publico"].startswith("https://invitaai.test/i/")
+        _, event = await call(client, "create_event", {"event_type": "boda", "title": "Boda Ana y Luis", "date": "2026-12-12"})
+        _, inv = await call(client, "create_invitation", {"event_id": event["event_id"], "theme": "champagne"})
+        assert inv["public_link"].startswith("https://invitaai.test/i/")
 
-        _, guest = await call(client, "agregar_invitado", {"invitacion_id": inv["invitacion_id"], "nombre": "Tía Rosa", "lugares": 2})
-        assert "/g/" in guest["link_personal"] and guest["lugares"] == 2
+        _, guest = await call(client, "add_guest", {"invitation_id": inv["invitation_id"], "name": "Tía Rosa", "seats": 2})
+        assert "/g/" in guest["personal_link"] and guest["seats"] == 2
 
-        _, events = await call(client, "listar_eventos")
-        assert [e["titulo"] for e in events] == ["Boda Ana y Luis"]
+        _, events = await call(client, "list_events")
+        assert [e["title"] for e in events] == ["Boda Ana y Luis"]
 
 
 @pytest.mark.anyio
 async def test_invalid_event_type_is_rejected_by_the_schema(api, store):
     async with Client(make_server(api, store)) as client:
         await connect(client, api)
-        status, _ = await call(client, "crear_evento", {"tipo": "fiesta_rara", "titulo": "X", "fecha": "2026-12-12"})
+        status, _ = await call(client, "create_event", {"event_type": "fiesta_rara", "title": "X", "date": "2026-12-12"})
     assert status == "error"
     assert api.events == {}
 
@@ -114,12 +114,12 @@ async def test_invalid_event_type_is_rejected_by_the_schema(api, store):
 async def test_activate_is_idempotent(api, store):
     async with Client(make_server(api, store)) as client:
         await connect(client, api)
-        _, event = await call(client, "crear_evento", {"tipo": "xv", "titulo": "XV", "fecha": "2026-11-01"})
-        _, inv = await call(client, "crear_invitacion", {"evento_id": event["evento_id"]})
-        await call(client, "activar_invitacion", {"invitacion_id": inv["invitacion_id"], "activa": True})
+        _, event = await call(client, "create_event", {"event_type": "xv", "title": "XV", "date": "2026-11-01"})
+        _, inv = await call(client, "create_invitation", {"event_id": event["event_id"]})
+        await call(client, "set_invitation_active", {"invitation_id": inv["invitation_id"], "active": True})
         assert api.toggle_calls == 0  # already active: nothing to do
-        await call(client, "activar_invitacion", {"invitacion_id": inv["invitacion_id"], "activa": False})
-        await call(client, "activar_invitacion", {"invitacion_id": inv["invitacion_id"], "activa": False})
+        await call(client, "set_invitation_active", {"invitation_id": inv["invitation_id"], "active": False})
+        await call(client, "set_invitation_active", {"invitation_id": inv["invitation_id"], "active": False})
         assert api.toggle_calls == 1
 
 
@@ -127,9 +127,9 @@ async def test_activate_is_idempotent(api, store):
 async def test_guest_messages_are_labeled_as_third_party_text(api, store):
     async with Client(make_server(api, store)) as client:
         await connect(client, api)
-        _, summary = await call(client, "ver_confirmaciones", {"invitacion_id": "any"})
-    assert summary["respuestas"][0]["mensaje_del_invitado"].startswith("Ignora")
-    assert "mensaje" not in summary["respuestas"][0]  # only under the explicit third-party key
+        _, summary = await call(client, "get_rsvps", {"invitation_id": "any"})
+    assert summary["responses"][0]["guest_message"].startswith("Ignora")
+    assert "message" not in summary["responses"][0]  # only under the explicit third-party key
 
 
 # --- Expiry, renewal and revocation ------------------------------------------------------
@@ -139,16 +139,16 @@ async def test_warns_before_the_token_expires(store):
     api = FakeInvitaAI(token_days=10)
     async with Client(make_server(api, store)) as client:
         await connect(client, api)
-        _, state = await call(client, "estado_conexion")
-    assert "vence en" in state["aviso"]
+        _, state = await call(client, "connection_status")
+    assert "vence en" in state["warning"]
 
 
 @pytest.mark.anyio
 async def test_no_warning_with_plenty_of_time(api, store):
     async with Client(make_server(api, store)) as client:
         await connect(client, api)
-        _, state = await call(client, "estado_conexion")
-    assert "aviso" not in state and state["dias_de_acceso_restantes"] >= 89
+        _, state = await call(client, "connection_status")
+    assert "warning" not in state and state["days_of_access_left"] >= 89
 
 
 @pytest.mark.anyio
@@ -157,7 +157,7 @@ async def test_revoked_token_is_forgotten_and_explained(api, store):
         await connect(client, api)
         for t in api.tokens.values():
             t["revoked"] = True
-        status, text = await call(client, "listar_eventos")
+        status, text = await call(client, "list_events")
     assert status == "error" and "revocado" in text
     assert store.load() is None
 
@@ -166,5 +166,5 @@ async def test_revoked_token_is_forgotten_and_explained(api, store):
 async def test_tools_declare_read_only_hints(api, store):
     async with Client(make_server(api, store)) as client:
         tools = {t.name: t for t in (await client.list_tools()).tools}
-    assert tools["listar_eventos"].annotations.read_only_hint is True
-    assert tools["crear_evento"].annotations.read_only_hint is False
+    assert tools["list_events"].annotations.read_only_hint is True
+    assert tools["create_event"].annotations.read_only_hint is False
