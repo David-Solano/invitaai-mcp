@@ -163,6 +163,19 @@ async def test_revoked_token_is_forgotten_and_explained(api, store):
 
 
 @pytest.mark.anyio
+async def test_remote_mode_drops_the_local_login(api, store):
+    """Remotely, OAuth already connected the user: the login tools would be dead weight and the
+    instructions must not send them to connect_account."""
+    http = httpx.AsyncClient(transport=api.transport())
+    server = build_server(InvitaAIClient("https://invitaai.test", store, http=http), with_local_login=False)
+    async with Client(server) as client:
+        names = {t.name for t in (await client.list_tools()).tools}
+        instructions = client.instructions
+    assert {"connect_account", "finish_connection"} & names == set()
+    assert "connect_account" not in instructions  # the swap in build_server still matches
+
+
+@pytest.mark.anyio
 async def test_tools_declare_read_only_hints(api, store):
     async with Client(make_server(api, store)) as client:
         tools = {t.name: t for t in (await client.list_tools()).tools}
